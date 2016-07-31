@@ -12,12 +12,12 @@ Just install this, and to do "require 'crc'" only. Additional other work is not 
   * author: dearblue (mailto:dearblue@users.osdn.me)
   * report issue to: <https://osdn.jp/projects/rutsubo/ticket/>
   * how to install: ``gem install crc-turbo``
-  * version: 0.2
+  * version: 0.3
   * release quality: thechnical preview
   * licensing: BSD-2-Clause<br>any parts are under Creative Commons License Zero (CC0 / Public Domain).
-  * dependency gems: crc-0.2 (<https://rubygems/gems/crc>)
-  * dependency external c libraries: none
-  * bundled external c libraries: none
+  * dependency gems: crc-0.3 (<https://rubygems/gems/crc>)
+  * dependency external C libraries: none
+  * bundled external C libraries: none
 
 
 ## How to usage
@@ -26,8 +26,6 @@ First, install on your system.
 
 ``` shell:shell
 # gem install crc-turbo
-.....
-#
 ```
 
 And, to do ``require "crc"``.

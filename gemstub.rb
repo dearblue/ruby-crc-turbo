@@ -1,6 +1,6 @@
 GEMSTUB = Gem::Specification.new do |s|
   s.name = "crc-turbo"
-  s.version = "0.2"
+  s.version = "0.3"
   s.summary = "general CRC generator"
   s.description = <<EOS
 This is a C extention for "crc" gem library.
@@ -12,8 +12,8 @@ EOS
   s.email = "dearblue@users.osdn.me"
 
   s.required_ruby_version = ">= 2.0"
-  s.add_development_dependency "rake", "~> 11.0"
-  s.add_runtime_dependency "crc", "~> 0.2"
+  s.add_development_dependency "rake"
+  s.add_runtime_dependency "crc", "~> 0.3"
 end
 
 EXTMAP["crc"] = "crc/_turbo"

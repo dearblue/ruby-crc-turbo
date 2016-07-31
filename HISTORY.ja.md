@@ -2,6 +2,10 @@ This document is written in Japanese.
 
 # crc-turbo for ruby の更新履歴
 
+## crc-0.3
+
+  * crc-0.3 に追従して、CRC::BasicCRC と CRC::Generator を CRC に統合
+
 ## crc-0.2 (平成28年5月15日 (日))
 
   * \[FIX\] CRC::Generator#polynomial メソッドが間違った値を返していた問題を修正

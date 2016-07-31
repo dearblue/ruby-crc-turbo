@@ -16,15 +16,16 @@ enum {
     TABLE_NOTREADY = 0x1000,
 };
 
-#define SWITCH_BY_TYPE(FLAGS, STMT_U8, STMT_U16, STMT_U32, STMT_U64, STMT_U128) \
-    switch ((FLAGS) & TYPE_MASK) {                                              \
-    case TYPE_UINT8_T:      { STMT_U8; break; }                                 \
-    case TYPE_UINT16_T:     { STMT_U16; break; }                                \
-    case TYPE_UINT32_T:     { STMT_U32; break; }                                \
-    case TYPE_UINT64_T:     { STMT_U64; break; }                                \
- /* case TYPE_UINT128_T:    { STMT_U128; break; } */                            \
-    default: { rb_bug(" [INVALID TYPE FLAGS: 0x%02X] ", (FLAGS) & TYPE_MASK); } \
-    }                                                                           \
+//#define SNNIPET(BITSIZE, AS, TYPE, TOUINT, CONVUINT)
+#define SWITCH_BY_TYPE(TYPE, SNNIPET)                                                            \
+    switch ((TYPE)) {                                                                            \
+    case TYPE_UINT8_T:   { SNNIPET(  8,   as8,   uint8_t,   to_uint8,   conv_uint8); break; }    \
+    case TYPE_UINT16_T:  { SNNIPET( 16,  as16,  uint16_t,  to_uint16,  conv_uint16); break; }    \
+    case TYPE_UINT32_T:  { SNNIPET( 32,  as32,  uint32_t,  to_uint32,  conv_uint32); break; }    \
+    case TYPE_UINT64_T:  { SNNIPET( 64,  as64,  uint64_t,  to_uint64,  conv_uint64); break; }    \
+ /* case TYPE_UINT128_T: { SNNIPET(128, as128, uint128_t, to_uint128, conv_uint128); break; } */ \
+    default: { rb_bug(" [INVALID TYPE FLAGS: 0x%02X] ", (TYPE)); }                               \
+    }                                                                                            \
 
 static inline uint8_t
 to_uint8(VALUE num)
@@ -321,52 +322,50 @@ typedef struct anyuint_t
     };
 } anyuint_t;
 
-struct generator
+struct crc_module
 {
-    int bitsize;
-    int flags; /* int type, refin, refout */
+    uint32_t bitsize:10;
+    uint32_t type:10;
+    uint32_t reflect_input:1;
+    uint32_t reflect_output:1;
+
     anyuint_t bitmask, polynomial, initial, xorout;
     const void *table; /* entity is String buffer as instance variable */
 };
 
-static VALUE mCRC;          /* module CRC */
+static VALUE cCRC;          /* class CRC */
 static VALUE mUtils;        /* module CRC::Utils */
-static VALUE cGenerator;    /* class CRC::Generator */
-static ID generator_iv_name;
-static ID generator_iv_table_buffer;
+static ID ext_iv_name;
+static ID ext_iv_module;
+static ID ext_iv_table_buffer;
 
-static const rb_data_type_t generator_type = {
-    .wrap_struct_name = "crc-turbo.CRC::Generator",
+static const rb_data_type_t ext_type = {
+    .wrap_struct_name = "crc-turbo.CRC.module",
     .function.dmark = NULL,
     .function.dsize = NULL,
     .function.dfree = (void *)-1,
 };
 
-static void
-check_generator_notinit(VALUE obj)
+static struct crc_module *
+get_modulep(VALUE obj)
 {
-    struct generator *p;
-    TypedData_Get_Struct(obj, struct generator, &generator_type, p);
-    if (p) { rb_raise(rb_eArgError, "already initialized object - #<%s:0x%p>", rb_obj_classname(obj), (void *)obj); }
-}
-
-static struct generator *
-get_generator(VALUE obj)
-{
-    struct generator *p;
-    TypedData_Get_Struct(obj, struct generator, &generator_type, p);
-    if (!p) { rb_raise(rb_eArgError, "wrong initialized object - #<%s:0x%p>", rb_obj_classname(obj), (void *)obj); }
+    struct crc_module *p;
+    obj = rb_ivar_get(obj, ext_iv_module);
+    if (NIL_P(obj)) { return NULL; }
+    TypedData_Get_Struct(obj, struct crc_module, &ext_type, p);
     return p;
 }
 
-static VALUE
-generator_alloc(VALUE mod)
+static struct crc_module *
+get_module(VALUE obj)
 {
-    return TypedData_Wrap_Struct(mod, &generator_type, NULL);
+    struct crc_module *p = get_modulep(obj);
+    if (!p) { rb_raise(rb_eTypeError, "wrong initialized object - #<%s:0x%p>", rb_obj_classname(obj), (void *)obj); }
+    return p;
 }
 
 static void
-generator_init_args(int argc, VALUE argv[], int *flags, int *bitsize, VALUE *poly, VALUE *init, VALUE *xorout, VALUE *name)
+ext_init_args(int argc, VALUE argv[], int *flags, int *bitsize, VALUE *poly, VALUE *init, VALUE *xorout, VALUE *name)
 {
     rb_check_arity(argc, 2, 7);
     *bitsize = NUM2INT(argv[0]);
@@ -390,191 +389,180 @@ generator_init_args(int argc, VALUE argv[], int *flags, int *bitsize, VALUE *pol
     *name = (argc > 6 && !NIL_P(argv[6])) ? rb_String(argv[6]) : Qnil;
 }
 
-/*
- * call-seq:
- *  initialize(bitsize, polynomial, initial_state = 0, reflect_input = true, reflect_output = true, xor_output = ~0, name = nil)
- */
 static VALUE
-generator_init(int argc, VALUE argv[], VALUE obj)
+ext_s_new(int argc, VALUE argv[], VALUE crc)
 {
-    int flags, bitsize;
-    VALUE poly, init, xorout, name;
-    check_generator_notinit(obj);
-    generator_init_args(argc, argv, &flags, &bitsize, &poly, &init, &xorout, &name);
+    if (get_modulep(crc)) {
+        return rb_call_super(argc, argv);
+    } else {
+        int flags, bitsize;
+        VALUE poly, init, xorout, name;
+        ext_init_args(argc, argv, &flags, &bitsize, &poly, &init, &xorout, &name);
 
-    struct generator *p;
-    size_t allocsize = sizeof(struct generator);
-    RTYPEDDATA_DATA(obj) = p = (struct generator *)ALLOC_N(char, allocsize);
-    p->bitsize = bitsize;
-    p->flags = flags;
-    p->table = NULL;
+        struct crc_module *p;
+        VALUE crcmod = TypedData_Make_Struct(crc, struct crc_module, &ext_type, p);
 
-    /*
-     * bitmask の代入でわざわざ1ビット分を後から行う理由は、
-     * 例えば uint8_t に対して << 8 をすると何もしないため、
-     * これへの対処を目的とする。
-     */
-#define INIT_GENERATOR(TYPE, AS, TO_UINT, CONV_UINT, P, BITSIZE, POLY, INIT, XOROUT)   \
-    P->bitmask.AS = ~(~(TYPE)0 << 1 << (BITSIZE - 1));                              \
-    P->polynomial.AS = P->bitmask.AS & TO_UINT(POLY);                               \
-    P->initial.AS = P->bitmask.AS & TO_UINT(INIT);                                  \
-    P->xorout.AS = P->bitmask.AS & TO_UINT(XOROUT);                                 \
+        p->bitsize = bitsize;
+        p->type = flags & TYPE_MASK;
+        p->reflect_input = ((flags & REFLECT_INPUT) != 0) ? 1 : 0;
+        p->reflect_output = ((flags & REFLECT_OUTPUT) != 0) ? 1 : 0;
+        p->table = NULL;
 
-    SWITCH_BY_TYPE(flags,
-            INIT_GENERATOR(uint8_t, as8, to_uint8, conv_uint8, p, bitsize, poly, init, xorout),
-            INIT_GENERATOR(uint16_t, as16, to_uint16, conv_uint16, p, bitsize, poly, init, xorout),
-            INIT_GENERATOR(uint32_t, as32, to_uint32, conv_uint32, p, bitsize, poly, init, xorout),
-            INIT_GENERATOR(uint64_t, as64, to_uint64, conv_uint64, p, bitsize, poly, init, xorout),
-            INIT_GENERATOR(uint128_t, as128, to_uint128, conv_uint128, p, bitsize, poly, init, xorout));
+        /*
+         * bitmask の代入でわざわざ1ビット分を後から行う理由は、
+         * 例えば uint8_t に対して << 8 をすると何もしないため、
+         * これへの対処を目的とする。
+         */
+#define SNNIPET_INIT_MOD(BITSIZE, AS, TYPE, TOUINT, CONVUINT)  \
+        p->bitmask.AS = ~(~(TYPE)0 << 1 << (bitsize - 1));     \
+        p->polynomial.AS = p->bitmask.AS & TOUINT(poly);       \
+        p->initial.AS = p->bitmask.AS & TOUINT(init);          \
+        p->xorout.AS = p->bitmask.AS & TOUINT(xorout);         \
 
-#undef INIT_GENERATOR
+        SWITCH_BY_TYPE(p->type, SNNIPET_INIT_MOD);
 
-    rb_ivar_set(obj, generator_iv_name, name);
+        VALUE newcrc = rb_define_class_id(0, crc);
+        rb_ivar_set(newcrc, ext_iv_module, crcmod);
+        rb_ivar_set(newcrc, ext_iv_name, name);
 
-    return obj;
+        rb_extend_object(newcrc, rb_const_get(cCRC, rb_intern("ModuleClass")));
+        rb_define_alias(rb_singleton_class(newcrc), "[]", "new");
+
+        return newcrc;
+    }
 }
 
 static VALUE
-generator_bitsize(VALUE t)
+ext_bitsize(VALUE t)
 {
-    return INT2FIX(get_generator(t)->bitsize);
+    return INT2FIX(get_module(t)->bitsize);
 }
 
 static VALUE
-generator_bitmask(VALUE t)
+ext_bitmask(VALUE t)
 {
-    struct generator *p = get_generator(t);
-    SWITCH_BY_TYPE(p->flags,
-            return conv_uint8(p->bitmask.as8),
-            return conv_uint16(p->bitmask.as16),
-            return conv_uint32(p->bitmask.as32),
-            return conv_uint64(p->bitmask.as64),
-            return conv_uint128(p->bitmask.as128));
+    struct crc_module *p = get_module(t);
+
+#define SNNIPET_BITMASK(BITSIZE, AS, TYPE, TOUINT, CONVUINT) \
+    return CONVUINT(p->bitmask.AS);                          \
+
+    SWITCH_BY_TYPE(p->type, SNNIPET_BITMASK);
 }
 
 static VALUE
-generator_polynomial(VALUE t)
+ext_polynomial(VALUE t)
 {
-    struct generator *p = get_generator(t);
-    SWITCH_BY_TYPE(p->flags,
-            return conv_uint8(p->polynomial.as8),
-            return conv_uint16(p->polynomial.as16),
-            return conv_uint32(p->polynomial.as32),
-            return conv_uint64(p->polynomial.as64),
-            return conv_uint128(p->polynomial.as128));
+    struct crc_module *p = get_module(t);
+
+#define SNNIPET_POLYNOMIAL(BITSIZE, AS, TYPE, TOUINT, CONVUINT) \
+    return CONVUINT(p->polynomial.AS);                          \
+
+    SWITCH_BY_TYPE(p->type, SNNIPET_POLYNOMIAL);
 }
 
 static VALUE
-generator_initial_state(VALUE t)
+ext_initial_crc(VALUE t)
 {
-    struct generator *p = get_generator(t);
-    SWITCH_BY_TYPE(p->flags,
-            return conv_uint8(p->initial.as8),
-            return conv_uint16(p->initial.as16),
-            return conv_uint32(p->initial.as32),
-            return conv_uint64(p->initial.as64),
-            return conv_uint128(p->initial.as128));
+    struct crc_module *p = get_module(t);
+
+#define SNNIPET_INITIAL_CRC(BITSIZE, AS, TYPE, TOUINT, CONVUINT) \
+    return CONVUINT(p->initial.AS);                              \
+
+    SWITCH_BY_TYPE(p->type, SNNIPET_INITIAL_CRC);
 }
 
 static VALUE
-generator_table(VALUE t)
+ext_table(VALUE t)
 {
-    struct generator *p = get_generator(t);
+    struct crc_module *p = get_module(t);
     rb_raise(rb_eNotImpError, "");
 }
 
 static VALUE
-generator_reflect_input(VALUE t)
+ext_reflect_input(VALUE t)
 {
-    struct generator *p = get_generator(t);
-    return (p->flags & REFLECT_INPUT) ? Qtrue : Qfalse;
+    struct crc_module *p = get_module(t);
+    return (p->reflect_input != 0) ? Qtrue : Qfalse;
 }
 
 static VALUE
-generator_reflect_output(VALUE t)
+ext_reflect_output(VALUE t)
 {
-    struct generator *p = get_generator(t);
-    return (p->flags & REFLECT_OUTPUT) ? Qtrue : Qfalse;
+    struct crc_module *p = get_module(t);
+    return (p->reflect_output != 0) ? Qtrue : Qfalse;
 }
 
 static VALUE
-generator_xor_output(VALUE t)
+ext_xor_output(VALUE t)
 {
-    struct generator *p = get_generator(t);
-    SWITCH_BY_TYPE(p->flags,
-            return conv_uint8(p->xorout.as8),
-            return conv_uint16(p->xorout.as16),
-            return conv_uint32(p->xorout.as32),
-            return conv_uint64(p->xorout.as64),
-            return conv_uint128(p->xorout.as128));
+    struct crc_module *p = get_module(t);
+
+#define SNNIPET_XOR_OUTPUT(BITSIZE, AS, TYPE, TOUINT, CONVUINT) \
+    return CONVUINT(p->xorout.AS);                              \
+
+    SWITCH_BY_TYPE(p->type, SNNIPET_XOR_OUTPUT);
 }
 
 static VALUE
-generator_name(VALUE t)
+ext_name(VALUE t)
 {
-    // get_generator で初期化の確認
-    get_generator(t);
+    // get_module で初期化の確認
+    get_module(t);
 
-    return rb_ivar_get(t, generator_iv_name);
+    return rb_ivar_get(t, ext_iv_name);
 }
 
 static VALUE
-generator_set_name(VALUE t, VALUE name)
+ext_set_name(VALUE t, VALUE name)
 {
-    // get_generator で初期化の確認
-    get_generator(t);
+    // get_module で初期化の確認
+    get_module(t);
 
-    rb_ivar_set(t, generator_iv_name, rb_String(name));
+    rb_ivar_set(t, ext_iv_name, rb_String(name));
     return name;
 }
 
 static VALUE
-generator_update(VALUE t, VALUE seq, VALUE state)
+ext_update(VALUE t, VALUE seq, VALUE state)
 {
-    struct generator *p = get_generator(t);
+    struct crc_module *p = get_module(t);
     rb_check_type(seq, RUBY_T_STRING);
     const char *q = RSTRING_PTR(seq);
     const char *qq = q + RSTRING_LEN(seq);
 
     if (!p->table) {
-        size_t tablebytes = (p->flags & TYPE_MASK) * 16 * 256;
+        size_t tablebytes = (p->type) * 16 * 256;
         VALUE tablebuf = rb_str_buf_new(tablebytes);
         rb_str_set_len(tablebuf, tablebytes);
         void *table = RSTRING_PTR(tablebuf);
-        if (p->flags & REFLECT_INPUT) {
-            SWITCH_BY_TYPE(p->flags,
-                    crc_build_reflect_tables_u8(p->bitsize, table, p->polynomial.as8, 16),
-                    crc_build_reflect_tables_u16(p->bitsize, table, p->polynomial.as16, 16),
-                    crc_build_reflect_tables_u32(p->bitsize, table, p->polynomial.as32, 16),
-                    crc_build_reflect_tables_u64(p->bitsize, table, p->polynomial.as64, 16),
-                    crc_build_reflect_tables_u128(p->bitsize, table, p->polynomial.as128, 16));
+        if (p->reflect_input) {
+#define SNNIPET_BUILD_REFTABLE(BITSIZE, AS, TYPE, TOUINT, CONVUINT)                       \
+            crc_build_reflect_tables_u##BITSIZE(p->bitsize, table, p->polynomial.AS, 16); \
+
+            SWITCH_BY_TYPE(p->type, SNNIPET_BUILD_REFTABLE);
         } else {
-            SWITCH_BY_TYPE(p->flags,
-                    crc_build_tables_u8(p->bitsize, table, p->polynomial.as8, 16),
-                    crc_build_tables_u16(p->bitsize, table, p->polynomial.as16, 16),
-                    crc_build_tables_u32(p->bitsize, table, p->polynomial.as32, 16),
-                    crc_build_tables_u64(p->bitsize, table, p->polynomial.as64, 16),
-                    crc_build_tables_u128(p->bitsize, table, p->polynomial.as128, 16));
+#define SNNIPET_BUILD_TABLE(BITSIZE, AS, TYPE, TOUINT, CONVUINT)                  \
+            crc_build_tables_u##BITSIZE(p->bitsize, table, p->polynomial.AS, 16); \
+
+            SWITCH_BY_TYPE(p->type, SNNIPET_BUILD_TABLE);
         }
-        rb_ivar_set(t, generator_iv_table_buffer, tablebuf);
+        rb_ivar_set(t, ext_iv_table_buffer, tablebuf);
         rb_obj_freeze(tablebuf);
         p->table = table;
     }
 
-    if (p->flags & REFLECT_INPUT) {
-        SWITCH_BY_TYPE(p->flags,
-                return conv_uint8(crc_reflect_update_u8(p->bitsize, p->table, q, qq, to_uint8(state))),
-                return conv_uint16(crc_reflect_update_u16(p->bitsize, p->table, q, qq, to_uint16(state))),
-                return conv_uint32(crc_reflect_update_u32(p->bitsize, p->table, q, qq, to_uint32(state))),
-                return conv_uint64(crc_reflect_update_u64(p->bitsize, p->table, q, qq, to_uint64(state))),
-                return conv_uint128(crc_reflect_update_u128(p->bitsize, p->table, q, qq, to_uint128(state))));
+    if (p->reflect_input) {
+#define SNNIPET_REFUPDATE(BITSIZE, AS, TYPE, TOUINT, CONVUINT)      \
+        return CONVUINT(crc_reflect_update_u##BITSIZE(              \
+                    p->bitsize, p->table, q, qq, TOUINT(state)));   \
+
+        SWITCH_BY_TYPE(p->type, SNNIPET_REFUPDATE);
     } else {
-        SWITCH_BY_TYPE(p->flags,
-                return conv_uint8(crc_update_u8(p->bitsize, p->table, q, qq, to_uint8(state))),
-                return conv_uint16(crc_update_u16(p->bitsize, p->table, q, qq, to_uint16(state))),
-                return conv_uint32(crc_update_u32(p->bitsize, p->table, q, qq, to_uint32(state))),
-                return conv_uint64(crc_update_u64(p->bitsize, p->table, q, qq, to_uint64(state))),
-                return conv_uint128(crc_update_u128(p->bitsize, p->table, q, qq, to_uint128(state))));
+#define SNNIPET_UPDATE(BITSIZE, AS, TYPE, TOUINT, CONVUINT)         \
+        return CONVUINT(crc_update_u##BITSIZE(                      \
+                    p->bitsize, p->table, q, qq, TOUINT(state)));   \
+
+        SWITCH_BY_TYPE(p->type, SNNIPET_UPDATE);
     }
 }
 
@@ -639,30 +627,28 @@ utils_s_bitref128(VALUE mod, VALUE num)
 void
 Init__turbo(void)
 {
-    generator_iv_name = rb_intern("crc-turbo.CRC::Generator.name");
-    generator_iv_table_buffer = rb_intern("crc-turbo.CRC::Generator.table-buffer");
+    ext_iv_name = rb_intern("crc-turbo.CRC.name");
+    ext_iv_module = rb_intern("crc-turbo.CRC.module");
+    ext_iv_table_buffer = rb_intern("crc-turbo.CRC.table-buffer");
 
-    mCRC = rb_define_module("CRC");
+    cCRC = rb_define_class("CRC", rb_cObject);
+    rb_define_singleton_method(cCRC, "new", ext_s_new, -1);
+    rb_define_singleton_method(cCRC, "bitsize", ext_bitsize, 0);
+    rb_define_singleton_method(cCRC, "bitmask", ext_bitmask, 0);
+    rb_define_singleton_method(cCRC, "polynomial", ext_polynomial, 0);
+    rb_define_singleton_method(cCRC, "initial_crc", ext_initial_crc, 0);
+    rb_define_singleton_method(cCRC, "table", ext_table, 0);
+    rb_define_singleton_method(cCRC, "reflect_input?", ext_reflect_input, 0);
+    rb_define_singleton_method(cCRC, "reflect_output?", ext_reflect_output, 0);
+    rb_define_singleton_method(cCRC, "xor_output", ext_xor_output, 0);
+    rb_define_singleton_method(cCRC, "name", ext_name, 0);
+    rb_define_singleton_method(cCRC, "name=", ext_set_name, 1);
+    rb_define_singleton_method(cCRC, "update", ext_update, 2);
 
-    mUtils = rb_define_module_under(mCRC, "Utils");
+    mUtils = rb_define_module_under(cCRC, "Utils");
     rb_define_method(mUtils, "bitreflect8", utils_s_bitref8, 1);
     rb_define_method(mUtils, "bitreflect16", utils_s_bitref16, 1);
     rb_define_method(mUtils, "bitreflect32", utils_s_bitref32, 1);
     rb_define_method(mUtils, "bitreflect64", utils_s_bitref64, 1);
     rb_define_method(mUtils, "bitreflect128", utils_s_bitref128, 1);
-
-    cGenerator = rb_define_class_under(mCRC, "Generator", rb_cObject);
-    rb_define_alloc_func(cGenerator, generator_alloc);
-    rb_define_method(cGenerator, "initialize", generator_init, -1);
-    rb_define_method(cGenerator, "bitsize", generator_bitsize, 0);
-    rb_define_method(cGenerator, "bitmask", generator_bitmask, 0);
-    rb_define_method(cGenerator, "polynomial", generator_polynomial, 0);
-    rb_define_method(cGenerator, "initial_state", generator_initial_state, 0);
-    rb_define_method(cGenerator, "table", generator_table, 0);
-    rb_define_method(cGenerator, "reflect_input", generator_reflect_input, 0);
-    rb_define_method(cGenerator, "reflect_output", generator_reflect_output, 0);
-    rb_define_method(cGenerator, "xor_output", generator_xor_output, 0);
-    rb_define_method(cGenerator, "name", generator_name, 0);
-    rb_define_method(cGenerator, "name=", generator_set_name, 1);
-    rb_define_method(cGenerator, "update", generator_update, 2);
 }

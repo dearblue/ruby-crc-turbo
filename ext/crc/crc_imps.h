@@ -4,7 +4,7 @@
  *
  * This is a general CRC generator.
  *
- * It's used slice-by-16 algorithm with byte-order free and byte-alignment free.
+ * It's used slice-by-16 algorithm with byte-order free.
  * This is based on the Intel's slice-by-eight algorithm.
  *
  * Worst point is need more memory!
