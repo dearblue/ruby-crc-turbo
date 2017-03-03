@@ -9,12 +9,14 @@ Just install this, and to do "require 'crc'" only. Additional other work is not 
 ## Summary
 
   * package name: crc-turbo
-  * author: dearblue (mailto:dearblue@users.osdn.me)
-  * report issue to: <https://osdn.jp/projects/rutsubo/ticket/>
+  * author: dearblue (mailto:dearblue@users.noreply.github.com)
+  * report issue to: <https://github.com/dearblue/ruby-crc/issues>
   * how to install: ``gem install crc-turbo``
   * version: 0.3
-  * release quality: thechnical preview
-  * licensing: BSD-2-Clause<br>any parts are under Creative Commons License Zero (CC0 / Public Domain).
+  * production quality: TECHNICAL PREVIEW
+  * licensing:
+      * ***BSD-2-Clause : MAIN LICENSE***
+      * Creative Commons License Zero (CC0 / Public Domain) : ``ext/crc/crc_imps.h``
   * dependency gems: crc-0.3 (<https://rubygems/gems/crc>)
   * dependency external C libraries: none
   * bundled external C libraries: none
