@@ -425,7 +425,7 @@ ext_s_new(int argc, VALUE argv[], VALUE crc)
         rb_ivar_set(newcrc, ext_iv_module, crcmod);
         rb_ivar_set(newcrc, ext_iv_name, name);
 
-        rb_extend_object(newcrc, rb_const_get(cCRC, rb_intern("ModuleClass")));
+        rb_extend_object(newcrc, rb_const_get(cCRC, rb_intern("Calcurator")));
         rb_define_alias(rb_singleton_class(newcrc), "[]", "new");
 
         return newcrc;
