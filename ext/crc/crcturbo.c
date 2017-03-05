@@ -16,16 +16,16 @@ enum {
     TABLE_NOTREADY = 0x1000,
 };
 
-//#define SNNIPET(BITSIZE, AS, TYPE, TOUINT, CONVUINT)
-#define SWITCH_BY_TYPE(TYPE, SNNIPET)                                                            \
-    switch ((TYPE)) {                                                                            \
-    case TYPE_UINT8_T:   { SNNIPET(  8,   as8,   uint8_t,   to_uint8,   conv_uint8); break; }    \
-    case TYPE_UINT16_T:  { SNNIPET( 16,  as16,  uint16_t,  to_uint16,  conv_uint16); break; }    \
-    case TYPE_UINT32_T:  { SNNIPET( 32,  as32,  uint32_t,  to_uint32,  conv_uint32); break; }    \
-    case TYPE_UINT64_T:  { SNNIPET( 64,  as64,  uint64_t,  to_uint64,  conv_uint64); break; }    \
- /* case TYPE_UINT128_T: { SNNIPET(128, as128, uint128_t, to_uint128, conv_uint128); break; } */ \
-    default: { rb_bug(" [INVALID TYPE FLAGS: 0x%02X] ", (TYPE)); }                               \
-    }                                                                                            \
+//#define SNNIPET(BITSIZE, TYPE, TOUINT, CONVUINT)
+#define SWITCH_BY_TYPE(TYPE, SNNIPET)                                                     \
+    switch ((TYPE)) {                                                                     \
+    case TYPE_UINT8_T:   { SNNIPET(  8,   uint8_t,   to_uint8,   conv_uint8); break; }    \
+    case TYPE_UINT16_T:  { SNNIPET( 16,  uint16_t,  to_uint16,  conv_uint16); break; }    \
+    case TYPE_UINT32_T:  { SNNIPET( 32,  uint32_t,  to_uint32,  conv_uint32); break; }    \
+    case TYPE_UINT64_T:  { SNNIPET( 64,  uint64_t,  to_uint64,  conv_uint64); break; }    \
+ /* case TYPE_UINT128_T: { SNNIPET(128, uint128_t, to_uint128, conv_uint128); break; } */ \
+    default: { rb_bug(" [INVALID TYPE FLAGS: 0x%02X] ", (TYPE)); }                        \
+    }                                                                                     \
 
 static inline uint8_t
 to_uint8(VALUE num)
@@ -309,27 +309,13 @@ bitsize_to_type(int bitsize)
  *
  */
 
-typedef struct anyuint_t
-{
-    union {
-        uint8_t as8;
-        uint16_t as16;
-        uint32_t as32;
-        uint64_t as64;
-#ifdef HAVE_TYPE_UINT128_T
-        uint128_t as128;
-#endif
-    };
-} anyuint_t;
-
 struct crc_module
 {
     uint32_t bitsize:10;
     uint32_t type:10;
     uint32_t reflect_input:1;
     uint32_t reflect_output:1;
-
-    anyuint_t bitmask, polynomial, initial, xorout;
+    uint64_t bitmask, polynomial, initial, xorout;
     const void *table; /* entity is String buffer as instance variable */
 };
 
@@ -413,11 +399,11 @@ ext_s_new(int argc, VALUE argv[], VALUE crc)
          * 例えば uint8_t に対して << 8 をすると何もしないため、
          * これへの対処を目的とする。
          */
-#define SNNIPET_INIT_MOD(BITSIZE, AS, TYPE, TOUINT, CONVUINT)  \
-        p->bitmask.AS = ~(~(TYPE)0 << 1 << (bitsize - 1));     \
-        p->polynomial.AS = p->bitmask.AS & TOUINT(poly);       \
-        p->initial.AS = p->bitmask.AS & TOUINT(init);          \
-        p->xorout.AS = p->bitmask.AS & TOUINT(xorout);         \
+#define SNNIPET_INIT_MOD(BITSIZE, TYPE, TOUINT, CONVUINT)   \
+        p->bitmask = ~(~(uint64_t)0 << 1 << (bitsize - 1)); \
+        p->polynomial = p->bitmask & TOUINT(poly);          \
+        p->initial = p->bitmask & TOUINT(init);             \
+        p->xorout = p->bitmask & TOUINT(xorout);            \
 
         SWITCH_BY_TYPE(p->type, SNNIPET_INIT_MOD);
 
@@ -442,8 +428,8 @@ ext_bitmask(VALUE t)
 {
     struct crc_module *p = get_module(t);
 
-#define SNNIPET_BITMASK(BITSIZE, AS, TYPE, TOUINT, CONVUINT) \
-    return CONVUINT(p->bitmask.AS);                          \
+#define SNNIPET_BITMASK(BITSIZE, TYPE, TOUINT, CONVUINT) \
+    return CONVUINT(p->bitmask);                         \
 
     SWITCH_BY_TYPE(p->type, SNNIPET_BITMASK);
 }
@@ -453,8 +439,8 @@ ext_polynomial(VALUE t)
 {
     struct crc_module *p = get_module(t);
 
-#define SNNIPET_POLYNOMIAL(BITSIZE, AS, TYPE, TOUINT, CONVUINT) \
-    return CONVUINT(p->polynomial.AS);                          \
+#define SNNIPET_POLYNOMIAL(BITSIZE, TYPE, TOUINT, CONVUINT) \
+    return CONVUINT(p->polynomial);                         \
 
     SWITCH_BY_TYPE(p->type, SNNIPET_POLYNOMIAL);
 }
@@ -464,8 +450,8 @@ ext_initial_crc(VALUE t)
 {
     struct crc_module *p = get_module(t);
 
-#define SNNIPET_INITIAL_CRC(BITSIZE, AS, TYPE, TOUINT, CONVUINT) \
-    return CONVUINT(p->initial.AS);                              \
+#define SNNIPET_INITIAL_CRC(BITSIZE, TYPE, TOUINT, CONVUINT) \
+    return CONVUINT(p->initial);                             \
 
     SWITCH_BY_TYPE(p->type, SNNIPET_INITIAL_CRC);
 }
@@ -496,8 +482,8 @@ ext_xor_output(VALUE t)
 {
     struct crc_module *p = get_module(t);
 
-#define SNNIPET_XOR_OUTPUT(BITSIZE, AS, TYPE, TOUINT, CONVUINT) \
-    return CONVUINT(p->xorout.AS);                              \
+#define SNNIPET_XOR_OUTPUT(BITSIZE, TYPE, TOUINT, CONVUINT) \
+    return CONVUINT(p->xorout);                             \
 
     SWITCH_BY_TYPE(p->type, SNNIPET_XOR_OUTPUT);
 }
@@ -535,13 +521,13 @@ ext_update(VALUE t, VALUE seq, VALUE state)
         rb_str_set_len(tablebuf, tablebytes);
         void *table = RSTRING_PTR(tablebuf);
         if (p->reflect_input) {
-#define SNNIPET_BUILD_REFTABLE(BITSIZE, AS, TYPE, TOUINT, CONVUINT)                       \
-            crc_build_reflect_tables_u##BITSIZE(p->bitsize, table, p->polynomial.AS, 16); \
+#define SNNIPET_BUILD_REFTABLE(BITSIZE, TYPE, TOUINT, CONVUINT)                        \
+            crc_build_reflect_tables_u##BITSIZE(p->bitsize, table, p->polynomial, 16); \
 
             SWITCH_BY_TYPE(p->type, SNNIPET_BUILD_REFTABLE);
         } else {
-#define SNNIPET_BUILD_TABLE(BITSIZE, AS, TYPE, TOUINT, CONVUINT)                  \
-            crc_build_tables_u##BITSIZE(p->bitsize, table, p->polynomial.AS, 16); \
+#define SNNIPET_BUILD_TABLE(BITSIZE, TYPE, TOUINT, CONVUINT)                   \
+            crc_build_tables_u##BITSIZE(p->bitsize, table, p->polynomial, 16); \
 
             SWITCH_BY_TYPE(p->type, SNNIPET_BUILD_TABLE);
         }
@@ -551,15 +537,15 @@ ext_update(VALUE t, VALUE seq, VALUE state)
     }
 
     if (p->reflect_input) {
-#define SNNIPET_REFUPDATE(BITSIZE, AS, TYPE, TOUINT, CONVUINT)      \
-        return CONVUINT(crc_reflect_update_u##BITSIZE(              \
-                    p->bitsize, p->table, q, qq, TOUINT(state)));   \
+#define SNNIPET_REFUPDATE(BITSIZE, TYPE, TOUINT, CONVUINT)        \
+        return CONVUINT(crc_reflect_update_u##BITSIZE(            \
+                    p->bitsize, p->table, q, qq, TOUINT(state))); \
 
         SWITCH_BY_TYPE(p->type, SNNIPET_REFUPDATE);
     } else {
-#define SNNIPET_UPDATE(BITSIZE, AS, TYPE, TOUINT, CONVUINT)         \
-        return CONVUINT(crc_update_u##BITSIZE(                      \
-                    p->bitsize, p->table, q, qq, TOUINT(state)));   \
+#define SNNIPET_UPDATE(BITSIZE, TYPE, TOUINT, CONVUINT)           \
+        return CONVUINT(crc_update_u##BITSIZE(                    \
+                    p->bitsize, p->table, q, qq, TOUINT(state))); \
 
         SWITCH_BY_TYPE(p->type, SNNIPET_UPDATE);
     }
