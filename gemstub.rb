@@ -14,7 +14,7 @@ EOS
 
   s.required_ruby_version = ">= 2.2"
   s.add_development_dependency "rake"
-  s.add_runtime_dependency "crc", "~> 0.4.A"
+  s.add_runtime_dependency "crc", "~> 0.4.0"
 end
 
 EXTMAP["crc"] = "crc/_turbo"

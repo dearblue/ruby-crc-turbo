@@ -12,7 +12,7 @@ Additional other work is not required.
 
   * package name: crc-turbo
   * author: dearblue (mailto:dearblue@users.noreply.github.com)
-  * report issue to: <https://github.com/dearblue/ruby-crc/issues>
+  * report issue to: <https://github.com/dearblue/ruby-crc-turbo/issues>
   * how to install: ``gem install crc-turbo``
   * version: 0.4
   * production quality: TECHNICAL PREVIEW

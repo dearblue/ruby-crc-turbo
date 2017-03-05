@@ -3,7 +3,7 @@ This document is written in Japanese.
 # crc-turbo for ruby の更新履歴
 
 
-## crc-0.4 (TRYOUT)
+## crc-0.4 (平成29年3月5日 日曜日)
 
   * crc-0.4 に追従
 
