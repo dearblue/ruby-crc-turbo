@@ -2,7 +2,7 @@ This document is written in Japanese.
 
 # crc-turbo for ruby の更新履歴
 
-## crc-0.3
+## crc-0.3 (平成28年7月31日 日曜日)
 
   * crc-0.3 に追従して、CRC::BasicCRC と CRC::Generator を CRC に統合
 
