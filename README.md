@@ -1,5 +1,5 @@
 
-# crc-turbo - CRC generator for ruby
+# crc-turbo - C written accelerator for ruby CRC calcurator
 
 This is a C extention for "crc" gem library.
 

@@ -2,7 +2,7 @@
  * author:: dearblue <dearblue@users.noreply.github.com>
  * license:: Creative Commons License Zero (CC0 / Public Domain)
  *
- * This is a general CRC generator.
+ * This is a general CRC calcurator.
  *
  * It's used slice-by-16 algorithm with byte-order free.
  * This is based on the Intel's slice-by-eight algorithm.
