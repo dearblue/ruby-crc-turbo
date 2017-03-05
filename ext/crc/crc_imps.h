@@ -1,5 +1,5 @@
 /*
- * author:: dearblue <dearblue@users.osdn.me>
+ * author:: dearblue <dearblue@users.noreply.github.com>
  * license:: Creative Commons License Zero (CC0 / Public Domain)
  *
  * This is a general CRC generator.
