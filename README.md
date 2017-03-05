@@ -1,9 +1,11 @@
 
 # crc-turbo - C written accelerator for ruby CRC calcurator
 
-This is a C extention for "crc" gem library.
+C written accelerator for "crc" gem library.
 
-Just install this, and to do "require 'crc'" only. Additional other work is not required.
+Just install this, and to do ``require "crc"`` only.
+
+Additional other work is not required.
 
 
 ## Summary
