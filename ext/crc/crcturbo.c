@@ -407,7 +407,7 @@ ext_s_new(int argc, VALUE argv[], VALUE crc)
 
         SWITCH_BY_TYPE(p->type, SNNIPET_INIT_MOD);
 
-        VALUE newcrc = rb_define_class_id(0, crc);
+        VALUE newcrc = rb_class_new(crc);
         rb_ivar_set(newcrc, ext_iv_model, crcmod);
         rb_ivar_set(newcrc, ext_iv_name, name);
 
