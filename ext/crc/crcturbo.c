@@ -309,7 +309,7 @@ bitsize_to_type(int bitsize)
  *
  */
 
-struct crc_module
+struct crc_model
 {
     uint32_t bitsize:10;
     uint32_t type:10;
@@ -322,30 +322,30 @@ struct crc_module
 static VALUE cCRC;          /* class CRC */
 static VALUE mUtils;        /* module CRC::Utils */
 static ID ext_iv_name;
-static ID ext_iv_module;
+static ID ext_iv_model;
 static ID ext_iv_table_buffer;
 
 static const rb_data_type_t ext_type = {
-    .wrap_struct_name = "crc-turbo.CRC.module",
+    .wrap_struct_name = "crc-turbo.CRC.model",
     .function.dmark = NULL,
     .function.dsize = NULL,
     .function.dfree = (void *)-1,
 };
 
-static struct crc_module *
-get_modulep(VALUE obj)
+static struct crc_model *
+get_modelp(VALUE obj)
 {
-    struct crc_module *p;
-    obj = rb_ivar_get(obj, ext_iv_module);
+    struct crc_model *p;
+    obj = rb_ivar_get(obj, ext_iv_model);
     if (NIL_P(obj)) { return NULL; }
-    TypedData_Get_Struct(obj, struct crc_module, &ext_type, p);
+    TypedData_Get_Struct(obj, struct crc_model, &ext_type, p);
     return p;
 }
 
-static struct crc_module *
-get_module(VALUE obj)
+static struct crc_model *
+get_model(VALUE obj)
 {
-    struct crc_module *p = get_modulep(obj);
+    struct crc_model *p = get_modelp(obj);
     if (!p) { rb_raise(rb_eTypeError, "wrong initialized object - #<%s:0x%p>", rb_obj_classname(obj), (void *)obj); }
     return p;
 }
@@ -378,15 +378,15 @@ ext_init_args(int argc, VALUE argv[], int *flags, int *bitsize, VALUE *poly, VAL
 static VALUE
 ext_s_new(int argc, VALUE argv[], VALUE crc)
 {
-    if (get_modulep(crc)) {
+    if (get_modelp(crc)) {
         return rb_call_super(argc, argv);
     } else {
         int flags, bitsize;
         VALUE poly, init, xorout, name;
         ext_init_args(argc, argv, &flags, &bitsize, &poly, &init, &xorout, &name);
 
-        struct crc_module *p;
-        VALUE crcmod = TypedData_Make_Struct(crc, struct crc_module, &ext_type, p);
+        struct crc_model *p;
+        VALUE crcmod = TypedData_Make_Struct(crc, struct crc_model, &ext_type, p);
 
         p->bitsize = bitsize;
         p->type = flags & TYPE_MASK;
@@ -408,7 +408,7 @@ ext_s_new(int argc, VALUE argv[], VALUE crc)
         SWITCH_BY_TYPE(p->type, SNNIPET_INIT_MOD);
 
         VALUE newcrc = rb_define_class_id(0, crc);
-        rb_ivar_set(newcrc, ext_iv_module, crcmod);
+        rb_ivar_set(newcrc, ext_iv_model, crcmod);
         rb_ivar_set(newcrc, ext_iv_name, name);
 
         rb_extend_object(newcrc, rb_const_get(cCRC, rb_intern("Calcurator")));
@@ -420,13 +420,13 @@ ext_s_new(int argc, VALUE argv[], VALUE crc)
 static VALUE
 ext_bitsize(VALUE t)
 {
-    return INT2FIX(get_module(t)->bitsize);
+    return INT2FIX(get_model(t)->bitsize);
 }
 
 static VALUE
 ext_bitmask(VALUE t)
 {
-    struct crc_module *p = get_module(t);
+    struct crc_model *p = get_model(t);
 
 #define SNNIPET_BITMASK(BITSIZE, TYPE, TOUINT, CONVUINT) \
     return CONVUINT(p->bitmask);                         \
@@ -437,7 +437,7 @@ ext_bitmask(VALUE t)
 static VALUE
 ext_polynomial(VALUE t)
 {
-    struct crc_module *p = get_module(t);
+    struct crc_model *p = get_model(t);
 
 #define SNNIPET_POLYNOMIAL(BITSIZE, TYPE, TOUINT, CONVUINT) \
     return CONVUINT(p->polynomial);                         \
@@ -448,7 +448,7 @@ ext_polynomial(VALUE t)
 static VALUE
 ext_initial_crc(VALUE t)
 {
-    struct crc_module *p = get_module(t);
+    struct crc_model *p = get_model(t);
 
 #define SNNIPET_INITIAL_CRC(BITSIZE, TYPE, TOUINT, CONVUINT) \
     return CONVUINT(p->initial);                             \
@@ -459,28 +459,28 @@ ext_initial_crc(VALUE t)
 static VALUE
 ext_table(VALUE t)
 {
-    struct crc_module *p = get_module(t);
+    struct crc_model *p = get_model(t);
     rb_raise(rb_eNotImpError, "");
 }
 
 static VALUE
 ext_reflect_input(VALUE t)
 {
-    struct crc_module *p = get_module(t);
+    struct crc_model *p = get_model(t);
     return (p->reflect_input != 0) ? Qtrue : Qfalse;
 }
 
 static VALUE
 ext_reflect_output(VALUE t)
 {
-    struct crc_module *p = get_module(t);
+    struct crc_model *p = get_model(t);
     return (p->reflect_output != 0) ? Qtrue : Qfalse;
 }
 
 static VALUE
 ext_xor_output(VALUE t)
 {
-    struct crc_module *p = get_module(t);
+    struct crc_model *p = get_model(t);
 
 #define SNNIPET_XOR_OUTPUT(BITSIZE, TYPE, TOUINT, CONVUINT) \
     return CONVUINT(p->xorout);                             \
@@ -491,8 +491,8 @@ ext_xor_output(VALUE t)
 static VALUE
 ext_name(VALUE t)
 {
-    // get_module で初期化の確認
-    get_module(t);
+    // get_model で初期化の確認
+    get_model(t);
 
     return rb_ivar_get(t, ext_iv_name);
 }
@@ -500,8 +500,8 @@ ext_name(VALUE t)
 static VALUE
 ext_set_name(VALUE t, VALUE name)
 {
-    // get_module で初期化の確認
-    get_module(t);
+    // get_model で初期化の確認
+    get_model(t);
 
     rb_ivar_set(t, ext_iv_name, rb_String(name));
     return name;
@@ -510,7 +510,7 @@ ext_set_name(VALUE t, VALUE name)
 static VALUE
 ext_update(VALUE t, VALUE seq, VALUE state)
 {
-    struct crc_module *p = get_module(t);
+    struct crc_model *p = get_model(t);
     rb_check_type(seq, RUBY_T_STRING);
     const char *q = RSTRING_PTR(seq);
     const char *qq = q + RSTRING_LEN(seq);
@@ -613,7 +613,7 @@ void
 Init__turbo(void)
 {
     ext_iv_name = rb_intern("crc-turbo.CRC.name");
-    ext_iv_module = rb_intern("crc-turbo.CRC.module");
+    ext_iv_model = rb_intern("crc-turbo.CRC.model");
     ext_iv_table_buffer = rb_intern("crc-turbo.CRC.table-buffer");
 
     cCRC = rb_define_class("CRC", rb_cObject);
