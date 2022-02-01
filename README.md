@@ -8,22 +8,6 @@ Just install this, and to do ``require "crc"`` only.
 Additional other work is not required.
 
 
-## Summary
-
-  * package name: crc-turbo
-  * author: dearblue (mailto:dearblue@users.noreply.github.com)
-  * report issue to: <https://github.com/dearblue/ruby-crc-turbo/issues>
-  * how to install: ``gem install crc-turbo``
-  * version: 0.4
-  * production quality: TECHNICAL PREVIEW
-  * licensing:
-      * ***BSD-2-Clause : MAIN LICENSE***
-      * Creative Commons License Zero (CC0 / Public Domain) : ``ext/crc/crc_imps.h``
-  * dependency gems: crc-0.4 (<https://rubygems/gems/crc>)
-  * dependency external C libraries: none
-  * bundled external C libraries: none
-
-
 ## How to usage
 
 First, install on your system.
@@ -54,3 +38,19 @@ $ ruby -r crc -e 'puts $".grep(/crc/)'
 /usr/local/lib/ruby/gems/2.3/gems/crc-0.2/lib/crc.rb
 $
 ```
+
+
+## Specification
+
+  - package name: crc-turbo (<https://github.com/dearblue/ruby-crc-turbo>)
+  - author: dearblue (<https://github.com/dearblue>)
+  - report issue to: <https://github.com/dearblue/ruby-crc-turbo/issues>
+  - how to install: `gem install crc-turbo`
+  - version: 0.4
+  - production quality: TECHNICAL PREVIEW
+  - licensing:
+      - ***BSD-2-Clause : MAIN LICENSE***
+      - Creative Commons License Zero (CC0 / Public Domain) : `ext/crc/crc_imps.h`
+  - dependency gems: crc-0.4 (<https://rubygems/gems/crc>)
+  - dependency external C libraries: none
+  - bundled external C libraries: none
