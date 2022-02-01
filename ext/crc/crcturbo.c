@@ -386,7 +386,7 @@ ext_s_new(int argc, VALUE argv[], VALUE crc)
         ext_init_args(argc, argv, &flags, &bitsize, &poly, &init, &xorout, &name);
 
         struct crc_model *p;
-        VALUE crcmod = TypedData_Make_Struct(crc, struct crc_model, &ext_type, p);
+        VALUE crcmod = TypedData_Make_Struct(rb_cObject, struct crc_model, &ext_type, p);
 
         p->bitsize = bitsize;
         p->type = flags & TYPE_MASK;
