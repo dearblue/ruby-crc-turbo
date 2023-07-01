@@ -1,6 +1,12 @@
 #include <ruby.h>
+#include <ruby/intern.h>
 #include <ruby/version.h>
 #include <stdint.h>
+#include <stdbool.h>
+
+#ifndef RB_EXT_RACTOR_SAFE
+# define RB_EXT_RACTOR_SAFE(FEATURE) ((void)(FEATURE))
+#endif
 
 enum {
     TYPE_MASK      =   0xff,
@@ -309,6 +315,24 @@ bitsize_to_type(int bitsize)
  *
  */
 
+#include <ruby/thread_native.h>
+
+static VALUE
+aux_native_mutex_synchronize_cleanup(VALUE opaque)
+{
+    rb_native_mutex_unlock((rb_nativethread_lock_t *)opaque);
+    return Qnil;
+}
+
+static VALUE
+aux_native_mutex_synchronize(rb_nativethread_lock_t *mutex, VALUE (*body)(VALUE), VALUE opaque)
+{
+    rb_native_mutex_lock(mutex);
+    return rb_ensure(body, opaque, aux_native_mutex_synchronize_cleanup, (VALUE)mutex);
+}
+
+static rb_nativethread_lock_t crc_mutex_table_initialize;
+
 struct crc_model
 {
     uint32_t bitsize:10;
@@ -316,7 +340,7 @@ struct crc_model
     uint32_t reflect_input:1;
     uint32_t reflect_output:1;
     uint64_t bitmask, polynomial, initial, xorout;
-    const void *table; /* entity is String buffer as instance variable */
+    const void *table;
 };
 
 static VALUE cCRC;          /* class CRC */
@@ -325,11 +349,24 @@ static ID ext_iv_name;
 static ID ext_iv_model;
 static ID ext_iv_table_buffer;
 
+static void
+crc_model_free(void *opaque)
+{
+    if (opaque) {
+        struct crc_model *p = (struct crc_model *)opaque;
+        if (p->table) {
+            ruby_xfree((void *)(uintptr_t)p->table);
+            p->table = NULL;
+        }
+        ruby_xfree(opaque);
+    }
+}
+
 static const rb_data_type_t ext_type = {
     .wrap_struct_name = "crc-turbo.CRC.model",
     .function.dmark = NULL,
     .function.dsize = NULL,
-    .function.dfree = (void *)-1,
+    .function.dfree = crc_model_free,
 };
 
 static struct crc_model *
@@ -387,6 +424,7 @@ ext_s_new(int argc, VALUE argv[], VALUE crc)
 
         struct crc_model *p;
         VALUE crcmod = TypedData_Make_Struct(rb_cObject, struct crc_model, &ext_type, p);
+        rb_obj_freeze(crcmod);
 
         p->bitsize = bitsize;
         p->type = flags & TYPE_MASK;
@@ -503,23 +541,19 @@ ext_set_name(VALUE t, VALUE name)
     // get_model で初期化の確認
     get_model(t);
 
-    rb_ivar_set(t, ext_iv_name, rb_String(name));
+    rb_ivar_set(t, ext_iv_name, rb_str_dup_frozen(rb_String(name)));
     return name;
 }
 
 static VALUE
-ext_update(VALUE t, VALUE seq, VALUE state)
+ext_table_initialize(VALUE arg)
 {
-    struct crc_model *p = get_model(t);
-    rb_check_type(seq, RUBY_T_STRING);
-    const char *q = RSTRING_PTR(seq);
-    const char *qq = q + RSTRING_LEN(seq);
+    struct crc_model *p = (struct crc_model *)arg;
 
     if (!p->table) {
-        size_t tablebytes = (p->type) * 16 * 256;
-        VALUE tablebuf = rb_str_buf_new(tablebytes);
-        rb_str_set_len(tablebuf, tablebytes);
-        void *table = RSTRING_PTR(tablebuf);
+        void *table = ruby_xmalloc2(16 * 256, p->type);
+        p->table = table;
+
         if (p->reflect_input) {
 #define SNNIPET_BUILD_REFTABLE(BITSIZE, TYPE, TOUINT, CONVUINT)                        \
             crc_build_reflect_tables_u##BITSIZE(p->bitsize, table, p->polynomial, 16); \
@@ -531,9 +565,21 @@ ext_update(VALUE t, VALUE seq, VALUE state)
 
             SWITCH_BY_TYPE(p->type, SNNIPET_BUILD_TABLE);
         }
-        rb_ivar_set(t, ext_iv_table_buffer, tablebuf);
-        rb_obj_freeze(tablebuf);
-        p->table = table;
+    }
+
+    return Qnil;
+}
+
+static VALUE
+ext_update(VALUE t, VALUE seq, VALUE state)
+{
+    struct crc_model *p = get_model(t);
+    rb_check_type(seq, RUBY_T_STRING);
+    const char *q = RSTRING_PTR(seq);
+    const char *qq = q + RSTRING_LEN(seq);
+
+    if (!p->table) {
+        aux_native_mutex_synchronize(&crc_mutex_table_initialize, ext_table_initialize, (VALUE)p);
     }
 
     if (p->reflect_input) {
@@ -612,6 +658,11 @@ utils_s_bitref128(VALUE mod, VALUE num)
 void
 Init__turbo(void)
 {
+    RB_EXT_RACTOR_SAFE(true);
+
+    // 破棄は OS に任せるため、これの対となる rb_native_mutex_destroy() は呼び出さない
+    rb_native_mutex_initialize(&crc_mutex_table_initialize);
+
     ext_iv_name = rb_intern("crc-turbo.CRC.name");
     ext_iv_model = rb_intern("crc-turbo.CRC.model");
     ext_iv_table_buffer = rb_intern("crc-turbo.CRC.table-buffer");
